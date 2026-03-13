@@ -20,7 +20,7 @@ export default function HeroSection() {
   return (
     <section 
       ref={containerRef} 
-      className="relative h-screen w-full flex flex-col items-center justify-center overflow-hidden"
+      className="relative min-h-screen w-full flex flex-col items-center justify-center py-32 px-6 overflow-hidden"
     >
       {/* Background Gradient Orbs */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--color-primary)]/20 rounded-full blur-[120px] pointer-events-none" />
@@ -71,6 +71,8 @@ export default function HeroSection() {
             เริ่มใช้งาน Canva Pro ตอนนี้
           </RainbowButton>
         </motion.div>
+
+
       </motion.div>
 
       <motion.div 
