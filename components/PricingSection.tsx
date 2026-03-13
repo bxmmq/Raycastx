@@ -79,9 +79,11 @@ export default function PricingSection({ pricing, session }: { pricing: Pricing,
   };
 
   return (
-    <section id="pricing" className="relative py-32 px-4 md:px-8 w-full max-w-7xl mx-auto overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-[var(--color-primary)]/10 blur-[150px] rounded-[100%] pointer-events-none" />
+    <section id="pricing" className="relative py-32 px-4 md:px-8 w-full max-w-7xl mx-auto">
+      {/* Enhanced Background Decor */}
+      <div className="absolute top-0 left-[-20%] w-[70%] h-[70%] bg-[var(--color-primary)]/5 rounded-full blur-[180px] pointer-events-none animate-pulse duration-[5000ms]" />
+      <div className="absolute bottom-0 right-[-20%] w-[70%] h-[70%] bg-[var(--color-accent)]/5 rounded-full blur-[180px] pointer-events-none animate-pulse duration-[7000ms]" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[150%] bg-[radial-gradient(circle_at_center,rgba(0,196,204,0.02)_0%,transparent_70%)] pointer-events-none" />
 
       <div className="text-center mb-20 relative z-10">
         <motion.div
@@ -137,8 +139,8 @@ export default function PricingSection({ pricing, session }: { pricing: Pricing,
                 <div className={`absolute inset-0 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] opacity-0 transition-opacity duration-500 rounded-3xl ${isSelected ? 'opacity-100' : 'group-hover:opacity-50'}`} />
                 
                 {/* Card Content */}
-                <div className={`relative flex flex-row justify-between items-center h-full p-4 sm:p-8 rounded-[1.4rem] backdrop-blur-xl transition-colors duration-500 ${
-                  isSelected ? 'bg-[#0f0f13] border-transparent' : 'bg-white/[0.02] border border-white/10 group-hover:bg-white/[0.05]'
+                <div className={`relative flex flex-row justify-between items-center h-full p-4 sm:p-8 rounded-[1.4rem] backdrop-blur-xl transition-all duration-500 border ${
+                  isSelected ? 'bg-zinc-900/60 border-[var(--color-primary)]/50 shadow-[0_0_20px_rgba(var(--color-primary-rgb),0.1)]' : 'bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.04]'
                 }`}>
                   
                   {isPopular && (
@@ -193,9 +195,9 @@ export default function PricingSection({ pricing, session }: { pricing: Pricing,
              whileInView={{ opacity: 1, scale: 1 }}
              viewport={{ once: true }}
              transition={{ duration: 0.6, delay: 0.3 }}
-             className="sticky top-28 rounded-[2.5rem] bg-gradient-to-b from-white/10 to-white/5 p-[1px] shadow-2xl"
+             className="sticky top-28 rounded-[2.5rem] bg-white/5 shadow-2xl overflow-hidden"
           >
-            <div className="bg-[#0a0a0c] p-8 sm:p-10 rounded-[2.4rem] relative overflow-hidden backdrop-blur-3xl h-full">
+            <div className="bg-black/20 p-8 sm:p-10 rounded-[2.4rem] relative overflow-hidden backdrop-blur-3xl h-full">
               
               {/* Checkout Glow */}
               <div className="absolute -top-32 -right-32 w-64 h-64 bg-[var(--color-primary)]/20 rounded-full blur-[80px] pointer-events-none" />
