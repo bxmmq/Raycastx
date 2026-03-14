@@ -1,15 +1,15 @@
-import db from '@/lib/db';
+import pool from '@/lib/db';
 import PricingManagerClient from './PricingManagerClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminPricingPage() {
-  const stmt = db.prepare("SELECT value FROM settings WHERE key = 'pricing'");
-  const result = stmt.get() as { value: string } | undefined;
+  const result = await pool.query("SELECT value FROM settings WHERE key = 'pricing'");
+  const pricingRow = result.rows[0];
 
   let pricing = { '1': 15, '7': 89, '30': 250, '365': 1500 };
-  if (result) {
-    pricing = JSON.parse(result.value);
+  if (pricingRow) {
+    pricing = JSON.parse(pricingRow.value);
   }
 
   return (

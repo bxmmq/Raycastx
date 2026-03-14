@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function POST(req: Request) {
   try {
@@ -10,11 +10,13 @@ export async function POST(req: Request) {
     }
 
     // Check for existing active orders with the same email
-    const activeOrder = db.prepare(`
+    const activeOrderResult = await pool.query(`
       SELECT id FROM orders 
-      WHERE email = ? AND status = 'active'
+      WHERE email = $1 AND status = 'active'
       LIMIT 1
-    `).get(email);
+    `, [email]);
+    
+    const activeOrder = activeOrderResult.rows[0];
 
     if (activeOrder) {
       return NextResponse.json(
@@ -24,30 +26,30 @@ export async function POST(req: Request) {
     }
 
     // Check for existing pending orders
-    const pendingOrder = db.prepare(`
+    const pendingOrderResult = await pool.query(`
       SELECT id FROM orders 
-      WHERE email = ? AND status = 'pending'
+      WHERE email = $1 AND status = 'pending'
       LIMIT 1
-    `).get(email) as any;
+    `, [email]);
+    
+    const pendingOrder = pendingOrderResult.rows[0];
 
     if (pendingOrder) {
       // Update the existing pending order with the new duration
-      db.prepare(`
+      await pool.query(`
         UPDATE orders 
-        SET duration_days = ?, created_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(duration_days, pendingOrder.id);
+        SET duration_days = $1, created_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [duration_days, pendingOrder.id]);
       
       return NextResponse.json({ success: true, updated: true });
     }
 
     // Insert order into database
-    const insert = db.prepare(`
+    await pool.query(`
       INSERT INTO orders (email, duration_days, status) 
-      VALUES (?, ?, 'pending')
-    `);
-    
-    insert.run(email, duration_days);
+      VALUES ($1, $2, 'pending')
+    `, [email, duration_days]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

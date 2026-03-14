@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function PUT(req: Request) {
   try {
@@ -9,12 +9,11 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Invalid pricing data' }, { status: 400 });
     }
 
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO settings (key, value) 
-      VALUES ('pricing', ?)
-    `);
-    
-    stmt.run(JSON.stringify(pricing));
+    await pool.query(`
+      INSERT INTO settings (key, value) 
+      VALUES ('pricing', $1)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `, [JSON.stringify(pricing)]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

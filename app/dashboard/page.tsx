@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import CountdownClient from '@/app/status/[email]/CountdownClient';
@@ -18,11 +18,13 @@ export default async function DashboardPage() {
   const { user } = session;
 
   // Fetch the latest order for this user email
-  const order = db.prepare(`
+  const orderResult = await pool.query(`
     SELECT * FROM orders 
-    WHERE email = ? 
+    WHERE email = $1 
     ORDER BY created_at DESC LIMIT 1
-  `).get(user.email) as any;
+  `, [user.email]);
+  
+  const order = orderResult.rows[0];
 
   return (
     <main className="min-h-screen p-6 pt-32 bg-[#030303] relative overflow-hidden flex flex-col items-center text-white">

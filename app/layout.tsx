@@ -14,7 +14,7 @@ const baiJamjuree = Bai_Jamjuree({
 });
 
 export const metadata: Metadata = {
-  title: "Raycast Canva PRO",
+  title: "Raycast | Canva PRO",
   description: "Premium Canva Pro subscriptions",
 };
 

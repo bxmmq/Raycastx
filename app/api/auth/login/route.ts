@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 import { login, hashPassword } from '@/lib/auth';
 
 
@@ -12,7 +12,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = userResult.rows[0];
+    
     if (!user) {
       return NextResponse.json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 });
     }
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Auto-promote owner to admin if needed
     if (user.email === 'worapon25472004@gmail.com' && user.role !== 'admin') {
-      db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run(user.email);
+      await pool.query("UPDATE users SET role = 'admin' WHERE email = $1", [user.email]);
       user.role = 'admin';
     }
 

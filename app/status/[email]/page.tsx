@@ -1,4 +1,4 @@
-import db from '@/lib/db';
+import pool from '@/lib/db';
 import { notFound } from 'next/navigation';
 import CountdownClient from './CountdownClient';
 import PendingStatusClient from './PendingStatusClient';
@@ -9,12 +9,13 @@ export default async function StatusPage({ params }: { params: Promise<{ email: 
   const { email } = await params;
   const decodedEmail = decodeURIComponent(email);
 
-  const stmt = db.prepare(`
+  const result = await pool.query(`
     SELECT * FROM orders 
-    WHERE email = ? 
+    WHERE email = $1 
     ORDER BY created_at DESC LIMIT 1
-  `);
-  const order = stmt.get(decodedEmail) as any;
+  `, [decodedEmail]);
+  
+  const order = result.rows[0];
 
   if (!order) {
     notFound();

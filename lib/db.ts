@@ -1,92 +1,95 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool } from 'pg';
 
-// Connect to SQLite database
-const dbName = process.env.DATABASE_PATH || 'raycast.db';
-const dbPath = path.resolve(process.cwd(), dbName);
-const db = new Database(dbPath, { verbose: console.log });
+// Connect to PostgreSQL database using DATABASE_URL
+const connectionString = process.env.DATABASE_URL;
 
-// Enable WAL mode for better concurrency
-try {
-  db.pragma('journal_mode = WAL');
-} catch (e) {
-  console.error('Warning: Could not enable WAL mode (database might be locked):', e);
+if (!connectionString) {
+  console.warn('WARNING: DATABASE_URL is not defined in environment variables. Database connection will fail.');
 }
 
-// Initialize database tables
-try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL,
-      password TEXT, -- Added for account credentials
-      duration_days INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'active', 'expired', 'rejected'
-      start_time DATETIME,
-      end_time DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+// In Next.js development, we want to reuse the pool to avoid exhausting connections
+const globalForPool = global as unknown as { pool: Pool };
+export const pool = globalForPool.pool || new Pool({
+  connectionString,
+  ssl: connectionString?.includes('railway') ? { rejectUnauthorized: false } : false
+});
 
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
+if (process.env.NODE_ENV !== 'production') globalForPool.pool = pool;
 
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT DEFAULT 'user',
-      first_name TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Create a View to see all members (including those without orders) in DB Browser
-    CREATE VIEW IF NOT EXISTS view_all_members AS
-    SELECT 
-      u.id as user_id,
-      u.first_name,
-      u.email,
-      u.role,
-      o.id as order_id,
-      o.status,
-      o.duration_days,
-      o.end_time,
-      u.created_at as registered_at
-    FROM users u
-    LEFT JOIN orders o ON u.email = o.email;
-  `);
-
-  // Ensure role column exists for existing user databases
+// Schema Initialization
+export async function initDb() {
+  const client = await pool.connect();
   try {
-    db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run();
+    await client.query('BEGIN');
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        first_name TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        password TEXT,
+        duration_days INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        start_time TIMESTAMPTZ,
+        end_time TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+
+    // View for members
+    await client.query(`
+      CREATE OR REPLACE VIEW view_all_members AS
+      SELECT 
+        u.id as user_id,
+        u.first_name,
+        u.email,
+        u.role,
+        o.id as order_id,
+        o.status,
+        o.duration_days,
+        o.end_time,
+        u.created_at as registered_at
+      FROM users u
+      LEFT JOIN orders o ON u.email = o.email;
+    `);
+
+    // Seed default settings if not exists
+    const checkSettings = await client.query('SELECT COUNT(*) as count FROM settings');
+    if (parseInt(checkSettings.rows[0].count) === 0) {
+      const defaultPrices = {
+        '1': 5,
+        '7': 20,
+        '30': 40,
+        '365': 400
+      };
+      await client.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['pricing', JSON.stringify(defaultPrices)]);
+    }
+
+    await client.query('COMMIT');
+    console.log('Database initialized successfully');
   } catch (e) {
-    // Column already exists or other error
+    await client.query('ROLLBACK');
+    console.error('Database Initialization Error:', e);
+  } finally {
+    client.release();
   }
-  
-  // Ensure first_name column exists for existing databases
-  try {
-    db.prepare("ALTER TABLE users ADD COLUMN first_name TEXT").run();
-  } catch (e) {
-    // Column already exists or other error
-  }
-} catch (e) {
-  console.error('Database Initialization Error (it might be locked by another program):', e);
 }
 
-// Seed default settings if not exists
-const checkSettings = db.prepare('SELECT COUNT(*) as count FROM settings').get() as { count: number };
-if (checkSettings.count === 0) {
-  const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-  
-  // Default prices for Canva Pro (in THB)
-  const defaultPrices = {
-    '1': 15,
-    '7': 89,
-    '30': 250,
-    '365': 1500
-  };
-  insertSetting.run('pricing', JSON.stringify(defaultPrices));
-}
+// Automatically initialize database
+initDb().catch(console.error);
 
-export default db;
+export default pool;
+

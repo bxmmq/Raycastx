@@ -1,7 +1,7 @@
 import HeroSection from "@/components/HeroSection";
 import FeaturesSection from "@/components/FeaturesSection";
 import PricingSection from "@/components/PricingSection";
-import db from "@/lib/db";
+import pool from "@/lib/db";
 
 // Remove db call from render path to avoid errors during build if db is not ready 
 // or if we use generateStaticParams. Since it's a dynamic page (using SQLite), 
@@ -11,12 +11,12 @@ export const dynamic = 'force-dynamic';
 
 async function getPricing() {
   try {
-    const stmt = db.prepare("SELECT value FROM settings WHERE key = 'pricing'");
-    const result = stmt.get() as { value: string } | undefined;
-    if (!result) {
+    const result = await pool.query("SELECT value FROM settings WHERE key = $1", ['pricing']);
+    const pricingRow = result.rows[0];
+    if (!pricingRow) {
       return { '1': 15, '7': 89, '30': 250, '365': 1500 };
     }
-    return JSON.parse(result.value);
+    return JSON.parse(pricingRow.value);
   } catch (e) {
     console.error("Database error:", e);
     return { '1': 15, '7': 89, '30': 250, '365': 1500 }; // Fallback
