@@ -12,9 +12,9 @@ export const pool = globalForPool.pool || new Pool({
 
 // Graceful Query Wrapper (Real Mode but Silent on Connection Errors)
 const originalQuery = pool.query.bind(pool);
-pool.query = async (text: string, params?: any[]) => {
+pool.query = async (...args: any[]) => {
   try {
-    return await originalQuery(text, params);
+    return await (originalQuery as any)(...args);
   } catch (err: any) {
     if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED')) {
       console.warn(`--- ⚠️ Database Connection Failed: ${err.message} (Check your DATABASE_URL in .env) ---`);
