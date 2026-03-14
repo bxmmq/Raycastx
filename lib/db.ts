@@ -1,75 +1,38 @@
 import { Pool } from 'pg';
-import fs from 'fs';
 
-let pool: any;
+const connectionString = process.env.DATABASE_URL;
 
-try {
-  const connectionString = process.env.DATABASE_URL;
+// Re-use pool in development to avoid exhausting connections
+const globalForPool = global as unknown as { pool: Pool };
 
-  if (!connectionString) {
-    console.warn('DATABASE_URL is not defined.');
+export const pool = globalForPool.pool || new Pool({
+  connectionString,
+  ssl: connectionString?.includes('railway') ? { rejectUnauthorized: false } : false
+});
+
+// Graceful Query Wrapper (Real Mode but Silent on Connection Errors)
+const originalQuery = pool.query.bind(pool);
+pool.query = async (text: string, params?: any[]) => {
+  try {
+    return await originalQuery(text, params);
+  } catch (err: any) {
+    if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED')) {
+      console.warn(`--- ⚠️ Database Connection Failed: ${err.message} (Check your DATABASE_URL in .env) ---`);
+    } else {
+      console.error('Database query error:', err.message || err);
+    }
+    return { rows: [], rowCount: 0 };
   }
+};
 
-  // Use a minimal config to avoid "Invalid URL"
-  const config: any = {
-    connectionString: connectionString,
-    ssl: connectionString?.includes('railway') && !connectionString?.includes('.internal') 
-      ? { rejectUnauthorized: false } 
-      : false
-  };
-
-  // Check if we are trying to use an internal Railway URL outside of Railway
-  const isInternalRailway = connectionString?.includes('railway.internal');
-  
-  if (isInternalRailway) {
-    console.log('--- ℹ️ Local Development Mode: Using Mock Database ---');
-    pool = {
-      query: async () => ({ rows: [], rowCount: 0 }),
-      connect: async () => { throw new Error("Internal DB not reachable locally"); },
-      on: () => {}
-    };
-  } else {
-    pool = new Pool(config);
-
-    // Wrap query to be more robust
-    const originalQuery = pool.query.bind(pool);
-    pool.query = async (text: string, params?: any[]) => {
-      try {
-        return await originalQuery(text, params);
-      } catch (err: any) {
-        // Only log serious errors, not just "not found" during local dev
-        if (!err.message.includes('ENOTFOUND')) {
-          console.error('Database query error:', err.message || err);
-        }
-        return { rows: [], rowCount: 0 };
-      }
-    };
-  }
-} catch (e: any) {
-  console.error("Critical error initializing database pool:", e);
-  // Create a dummy pool that always fails gracefully
-  pool = {
-    query: async () => { throw new Error("Database not initialized"); },
-    connect: async () => { throw new Error("Database not initialized"); },
-    on: () => {}
-  };
-}
-
-// Re-use pool in development
-const globalForPool = global as unknown as { pool: any };
-if (process.env.NODE_ENV !== 'production') {
-  if (!globalForPool.pool) globalForPool.pool = pool;
-}
-
-export { pool };
+if (process.env.NODE_ENV !== 'production') globalForPool.pool = pool;
 
 // Schema Initialization
 export async function initDb() {
-  let client;
+  const client = await pool.connect();
   try {
-    client = await pool.connect();
     await client.query('BEGIN');
-    
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -129,15 +92,14 @@ export async function initDb() {
     await client.query('COMMIT');
     console.log('Database initialized successfully');
   } catch (e) {
-    if (client) await client.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error('Database Initialization Error:', e);
   } finally {
-    if (client) client.release();
+    client.release();
   }
 }
 
 // Automatically initialize database
-initDb().catch(e => console.error("Database initialization failed:", e.message || e));
+initDb().catch(console.error);
 
 export default pool;
-

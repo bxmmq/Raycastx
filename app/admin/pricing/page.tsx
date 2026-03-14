@@ -4,12 +4,18 @@ import PricingManagerClient from './PricingManagerClient';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminPricingPage() {
-  const result = await pool.query("SELECT value FROM settings WHERE key = 'pricing'");
-  const pricingRow = result.rows[0];
-
   let pricing = { '1': 15, '7': 89, '30': 250, '365': 1500 };
-  if (pricingRow) {
-    pricing = JSON.parse(pricingRow.value);
+
+  try {
+    const result = await pool.query("SELECT value FROM settings WHERE key = 'pricing'");
+    const pricingRow = result.rows?.[0];
+
+    if (pricingRow) {
+      pricing = JSON.parse(pricingRow.value);
+    }
+  } catch (error) {
+    console.error("Admin Pricing DB Error:", error);
+    // Use default pricing if DB fails
   }
 
   return (

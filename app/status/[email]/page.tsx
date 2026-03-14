@@ -15,21 +15,7 @@ export default async function StatusPage({ params }: { params: Promise<{ email: 
     ORDER BY created_at DESC LIMIT 1
   `, [decodedEmail]);
   
-  let order = result.rows?.[0];
-
-  // MOCK: If DB is unreachable or mocked, we will create a fake order to show
-  const isMockPool = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes('internal');
-
-  if (!order && isMockPool) {
-    console.log(`--- ℹ️ Mocking Status Page for: ${decodedEmail} ---`);
-    order = {
-      email: decodedEmail,
-      duration_days: 30, // Default for mock
-      status: 'pending', // Show pending status by default
-      created_at: new Error().stack?.includes('Admin') ? new Date(Date.now() - 3600000) : new Date(),
-      password: null
-    };
-  }
+  const order = result.rows[0];
 
   if (!order) {
     notFound();

@@ -7,18 +7,16 @@ import { getSession } from "@/lib/auth";
 export const dynamic = 'force-dynamic';
 
 async function getPricing() {
-  const fallback = { '1': 15, '7': 89, '30': 250, '365': 1500 };
   try {
-    if (!pool || typeof pool.query !== 'function') {
-      return fallback;
-    }
     const result = await pool.query("SELECT value FROM settings WHERE key = $1", ['pricing']);
-    const pricingRow = result.rows?.[0];
-    if (!pricingRow) return fallback;
+    const pricingRow = result.rows[0];
+    if (!pricingRow) {
+      return { '1': 15, '7': 89, '30': 250, '365': 1500 };
+    }
     return JSON.parse(pricingRow.value);
-  } catch (e: any) {
-    console.error("Database error in getPricing:", e?.message || e);
-    return fallback;
+  } catch (e) {
+    console.error("Database error:", e);
+    return { '1': 15, '7': 89, '30': 250, '365': 1500 }; // Fallback
   }
 }
 
