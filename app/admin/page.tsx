@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminOrdersPage() {
   let stats = { totalOrders: 0, pendingOrders: 0, activeUsers: 0, totalRevenue: 0 };
   let orders = [];
-  let pricing = { '1': 15, '7': 89, '30': 250, '365': 1500 };
+  let pricing: Record<string, number> = { '1': 15, '7': 89, '30': 250, '365': 1500 };
 
   try {
     // Fetch stats
