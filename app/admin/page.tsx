@@ -7,21 +7,21 @@ export const dynamic = 'force-dynamic';
 export default async function AdminOrdersPage() {
   // Fetch stats
   const totalOrdersResult = await pool.query('SELECT COUNT(*) as count FROM orders');
-  const totalOrders = { count: parseInt(totalOrdersResult.rows[0].count) };
+  const totalOrders = { count: parseInt(totalOrdersResult.rows?.[0]?.count || '0') };
 
   const pendingOrdersResult = await pool.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
-  const pendingOrders = { count: parseInt(pendingOrdersResult.rows[0].count) };
+  const pendingOrders = { count: parseInt(pendingOrdersResult.rows?.[0]?.count || '0') };
 
   const activeUsersResult = await pool.query("SELECT COUNT(*) as count FROM orders WHERE status = 'active'");
-  const activeUsers = { count: parseInt(activeUsersResult.rows[0].count) };
+  const activeUsers = { count: parseInt(activeUsersResult.rows?.[0]?.count || '0') };
   
   // Estimate revenue (simplified)
   const pricingRowResult = await pool.query('SELECT value FROM settings WHERE key = $1', ['pricing']);
-  const pricingRow = pricingRowResult.rows[0];
+  const pricingRow = pricingRowResult.rows?.[0];
   const pricing = pricingRow ? JSON.parse(pricingRow.value) : { '1': 15, '7': 89, '30': 250, '365': 1500 };
   
   const ordersListResult = await pool.query("SELECT duration_days FROM orders WHERE status = 'active' OR status = 'expired'");
-  const ordersList = ordersListResult.rows;
+  const ordersList = ordersListResult.rows || [];
   const totalRevenue = ordersList.reduce((acc: any, order: any) => acc + (pricing[order.duration_days.toString()] || 0), 0);
 
   const stats = {
@@ -46,7 +46,7 @@ export default async function AdminOrdersPage() {
     ORDER BY created_at DESC 
     LIMIT 200
   `);
-  const orders = ordersResult.rows;
+  const orders = ordersResult.rows || [];
 
   const availablePackages = Object.keys(pricing).map(Number).sort((a, b) => a - b);
 

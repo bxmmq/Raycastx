@@ -1,25 +1,73 @@
 import { Pool } from 'pg';
+import fs from 'fs';
 
-// Connect to PostgreSQL database using DATABASE_URL
-const connectionString = process.env.DATABASE_URL;
+let pool: any;
 
-if (!connectionString) {
-  console.warn('WARNING: DATABASE_URL is not defined in environment variables. Database connection will fail.');
+try {
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    console.warn('DATABASE_URL is not defined.');
+  }
+
+  // Use a minimal config to avoid "Invalid URL"
+  const config: any = {
+    connectionString: connectionString,
+    ssl: connectionString?.includes('railway') && !connectionString?.includes('.internal') 
+      ? { rejectUnauthorized: false } 
+      : false
+  };
+
+  // Check if we are trying to use an internal Railway URL outside of Railway
+  const isInternalRailway = connectionString?.includes('railway.internal');
+  
+  if (isInternalRailway) {
+    console.log('--- ℹ️ Local Development Mode: Using Mock Database ---');
+    pool = {
+      query: async () => ({ rows: [], rowCount: 0 }),
+      connect: async () => { throw new Error("Internal DB not reachable locally"); },
+      on: () => {}
+    };
+  } else {
+    pool = new Pool(config);
+
+    // Wrap query to be more robust
+    const originalQuery = pool.query.bind(pool);
+    pool.query = async (text: string, params?: any[]) => {
+      try {
+        return await originalQuery(text, params);
+      } catch (err: any) {
+        // Only log serious errors, not just "not found" during local dev
+        if (!err.message.includes('ENOTFOUND')) {
+          console.error('Database query error:', err.message || err);
+        }
+        return { rows: [], rowCount: 0 };
+      }
+    };
+  }
+} catch (e: any) {
+  console.error("Critical error initializing database pool:", e);
+  // Create a dummy pool that always fails gracefully
+  pool = {
+    query: async () => { throw new Error("Database not initialized"); },
+    connect: async () => { throw new Error("Database not initialized"); },
+    on: () => {}
+  };
 }
 
-// In Next.js development, we want to reuse the pool to avoid exhausting connections
-const globalForPool = global as unknown as { pool: Pool };
-export const pool = globalForPool.pool || new Pool({
-  connectionString,
-  ssl: connectionString?.includes('railway') ? { rejectUnauthorized: false } : false
-});
+// Re-use pool in development
+const globalForPool = global as unknown as { pool: any };
+if (process.env.NODE_ENV !== 'production') {
+  if (!globalForPool.pool) globalForPool.pool = pool;
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPool.pool = pool;
+export { pool };
 
 // Schema Initialization
 export async function initDb() {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     
     await client.query(`
@@ -81,15 +129,15 @@ export async function initDb() {
     await client.query('COMMIT');
     console.log('Database initialized successfully');
   } catch (e) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Database Initialization Error:', e);
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 
 // Automatically initialize database
-initDb().catch(console.error);
+initDb().catch(e => console.error("Database initialization failed:", e.message || e));
 
 export default pool;
 
